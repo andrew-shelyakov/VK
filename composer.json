@@ -1,0 +1,24 @@
+{
+    "name": "andrew.shelyakov/vk",
+    "description": "The PHP library for working with vk.com API",
+    "keywords": ["vk", "vk.com", "api", "oauth"],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Andrew Shelyakov",
+            "email": "andrew.shelyakov@ya.ru"
+        }
+    ],
+    "support": {
+        "email": "andrew.shelyakov@ya.ru",
+        "issues": "https://github.com/andrew-shelyakov/VK/issues",
+        "source": "https://github.com/andrew-shelyakov/VK"
+    },
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "VK\\": "src/"
+        }
+    }
+}
