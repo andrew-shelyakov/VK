@@ -97,6 +97,6 @@ class Api {
 		if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
 			throw new Exception ($response['error']['error_msg'], $response['error']['error_code']);
 		}
-		return $response;
+		return $response['response'] ?? $response;
 	}
 }
