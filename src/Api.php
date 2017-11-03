@@ -36,6 +36,26 @@ class Api {
 		return new Wrapper ($this);
 	}
 
+	public function authorize (string $username, string $password, Captcha $captcha = NULL) {
+		$parameters = array_merge (
+			$this->getCommonParameters (),
+			[
+				'grant_type' => 'password',
+				'client_id' => $this->clientId,
+				'client_secret' => $this->clientSecret,
+				'username' => $username,
+				'password' => $password,
+			]
+		);
+		if ($captcha !== NULL) {
+			$captcha->addTo ($parameters);
+		}
+		$url = $this->oauthUrl . '/token?';
+		$url .= $this->buildQuery($parameters);
+		$response = $this->request ($url);
+		$this->accessToken = $response['access_token'];
+	}
+
 	public function call (string $method, array $parameters = [], Captcha $captcha = NULL) {
 		$url = $this->baseUrl . '/method/' . $method;
 		$parameters = array_filter (
@@ -123,8 +143,11 @@ class Api {
 						]
 					)
 				);
-			} else if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
-				$exception = new Exception\Response ($response['error']['error_msg'], $response['error']['error_code']);
+			} else if (isset ($response['error'], $response['error']['error_msg']) === TRUE) {
+				$exception = new Exception\Response (
+					$response['error']['error_msg'],
+					$response['error']['error_code']
+				);
 			}
 		}
 		curl_close ($curl);
