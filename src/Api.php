@@ -2,6 +2,7 @@
 namespace VK;
 use VK\Exception;
 use VK\Wrapper;
+use VK\Captcha;
 
 class Api {
 	public $baseUrl = 'https://api.vk.com';
@@ -35,15 +36,12 @@ class Api {
 		return new Wrapper ($this);
 	}
 
-	public function call (string $method, array $parameters = []) {
+	public function call (string $method, array $parameters = [], Captcha $captcha = NULL) {
 		$url = $this->baseUrl . '/method/' . $method;
 		$parameters = array_filter (
 			array_merge (
+				$this->getCommonParameters (),
 				[
-					'https' => $this->https,
-					'v' => $this->version,
-					'lang' => $this->language,
-					'test_mode' => $this->testMode,
 					'access_token' => $this->accessToken,
 				],
 				$parameters
@@ -52,6 +50,9 @@ class Api {
 				return !($value === NULL || $value === '');
 			}
 		);
+		if ($captcha !== NULL) {
+			$captcha->addTo ($parameters);
+		}
 		if ($this->accessToken !== NULL && $this->tokenSecret !== NULL) {
 			$parameters['sig'] = $this->generateSignature ($method, $parameters);
 		}
@@ -61,6 +62,15 @@ class Api {
 			[],
 			$parameters
 		);
+	}
+
+	private function getCommonParameters () {
+		return [
+			'v' => $this->version,
+			'lang' => $this->language,
+			'https' => $this->https,
+			'test_mode' => $this->testMode,
+		];
 	}
 
 	private function generateSignature (string $method, array $parameters = []) {
@@ -83,7 +93,6 @@ class Api {
 		$exception = NULL;
 		$options = [
 			CURLOPT_RETURNTRANSFER => TRUE,
-			CURLOPT_SAFE_UPLOAD => TRUE,
 			CURLOPT_USERAGENT => $this->userAgent,
 			CURLOPT_CUSTOMREQUEST => $method,
 			CURLOPT_HTTPHEADER => $headers,
@@ -96,10 +105,25 @@ class Api {
 		);
 		$response = curl_exec ($curl);
 		if ($response === FALSE) {
-			$exception = new Exception\Request (curl_error ($curl), curl_errno ($curl));
+			$exception = new Exception\Request (
+				curl_error ($curl),
+				curl_errno ($curl)
+			);
 		} else {
 			$response = json_decode ($response, TRUE);
-			if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
+			if (isset($response['captcha_sid'], $response['captcha_img']) === TRUE) {
+				$exception = new Exception\CaptchaNeeded (
+					'Captcha needed',
+					14,
+					NULL,
+					new Captcha (
+						[
+							'sid' => $response['captcha_sid'],
+							'img' => $response['captcha_img'],
+						]
+					)
+				);
+			} else if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
 				$exception = new Exception\Response ($response['error']['error_msg'], $response['error']['error_code']);
 			}
 		}

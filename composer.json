@@ -16,6 +16,7 @@
         "source": "https://github.com/andrew-shelyakov/VK"
     },
     "require": {
+        "php": ">=5.6.0",
         "ext-curl": "*"
     },
     "autoload": {
