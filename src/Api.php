@@ -5,10 +5,13 @@ use VK\Wrapper;
 
 class Api {
 	public $baseUrl = 'https://api.vk.com';
-	public $oauthUrl = 'https://oauth.vk.com/';
+	public $oauthUrl = 'https://oauth.vk.com';
 	public $callbackUrl;
+
 	public $version = '5.68';
 	public $language = 'en';
+	public $https = TRUE;
+	public $testMode;
 
 	public $userAgent;
 
@@ -33,28 +36,30 @@ class Api {
 	}
 
 	public function call (string $method, array $parameters = []) {
-		$method = '/method/' . $method;
+		$url = $this->baseUrl . '/method/' . $method;
 		$parameters = array_filter (
 			array_merge (
 				[
-					'https' => TRUE,
+					'https' => $this->https,
 					'v' => $this->version,
 					'lang' => $this->language,
-					'access_token' => $this->accessToken
+					'test_mode' => $this->testMode,
+					'access_token' => $this->accessToken,
 				],
 				$parameters
 			),
 			function ($value) {
-				return ($value !== NULL || $value !== '');
+				return !($value === NULL || $value === '');
 			}
 		);
 		if ($this->accessToken !== NULL && $this->tokenSecret !== NULL) {
 			$parameters['sig'] = $this->generateSignature ($method, $parameters);
 		}
-		$queryString = $this->buildQuery ($parameters);
 		return $this->request (
-			$this->baseUrl . $method,
-			$queryString
+			$url,
+			'POST',
+			[],
+			$parameters
 		);
 	}
 
@@ -63,10 +68,10 @@ class Api {
 		return md5 ($method . '?' . $queryString . $this->tokenSecret);
 	}
 
-	private function buildQuery (array $parameters = [], $encodeUrl = TRUE) {
+	private function buildQuery (array $parameters = [], bool $encode = TRUE) {
 		$queryArray = [];
 		foreach ($parameters as $parameter => $value) {
-			if ($encodeUrl === TRUE) {
+			if ($encode === TRUE) {
 				$value = urlencode ($value);
 			}
 			$queryArray[] = $parameter . '=' . $value;
@@ -74,28 +79,33 @@ class Api {
 		return implode ('&', $queryArray);
 	}
 
-	private function request ($url, $data, $headers = []) {
-		$response = json_decode (
-			file_get_contents (
-				$url,
-				FALSE,
-				stream_context_create (
-					[
-						'http' => [
-							'method'  => 'POST',
-							'header'  => [
-								'User-Agent: ' . $this->userAgent,
-								'Content-Type: application/x-www-form-urlencoded'
-							],
-							'content' => $data
-						]
-					]
-				)
-			),
-			TRUE
+	private function request (string $url, string $method = 'GET', array $headers = [], array $fields = []) {
+		$exception = NULL;
+		$options = [
+			CURLOPT_RETURNTRANSFER => TRUE,
+			CURLOPT_SAFE_UPLOAD => TRUE,
+			CURLOPT_USERAGENT => $this->userAgent,
+			CURLOPT_CUSTOMREQUEST => $method,
+			CURLOPT_HTTPHEADER => $headers,
+			CURLOPT_POSTFIELDS => $fields,
+		];
+		$curl = curl_init ($url);
+		curl_setopt_array (
+			$curl,
+			$options
 		);
-		if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
-			throw new Exception ($response['error']['error_msg'], $response['error']['error_code']);
+		$response = curl_exec ($curl);
+		if ($response === FALSE) {
+			$exception = new Exception\Request (curl_error ($curl), curl_errno ($curl));
+		} else {
+			$response = json_decode ($response, TRUE);
+			if (isset ($response['error'], $response['error']['error_msg'], $response['error']['error_code']) === TRUE) {
+				$exception = new Exception\Response ($response['error']['error_msg'], $response['error']['error_code']);
+			}
+		}
+		curl_close ($curl);
+		if ($exception !== NULL) {
+			throw $exception;			
 		}
 		return $response['response'] ?? $response;
 	}

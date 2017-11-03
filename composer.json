@@ -15,7 +15,9 @@
         "issues": "https://github.com/andrew-shelyakov/VK/issues",
         "source": "https://github.com/andrew-shelyakov/VK"
     },
-    "require": {},
+    "require": {
+        "ext-curl": "*"
+    },
     "autoload": {
         "psr-4": {
             "VK\\": "src/"
